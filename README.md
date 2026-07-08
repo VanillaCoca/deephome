@@ -1,134 +1,58 @@
-# Deephome 意图搜索引擎（原型）
+# Deephome
 
-把用户的**表层搜索词**还原成**真实意图**，再翻译成**可查询的房源属性**，并全程可解释、可纠错。
+**Intent-based home search for Toronto (and Canada).** Most search engines match the words you type. Deephome recovers what you actually *mean*, then ranks listings by the attributes that truly satisfy that intent — and explains every result.
 
-> "想要大窗户" 的真实意图往往是 "采光好"，而采光好由 **朝向 / 楼层 / 遮挡 / 开窗比例** 决定——
-> 这些用户从没提过。传统搜索匹配字面词，Deephome 匹配意图。
+<p align="center"><b>English</b> · <a href="./README.zh-CN.md">中文</a></p>
 
-完整设计与推理见 **[`DESIGN.md`](./DESIGN.md)**。
+> "I want big windows" usually really means **"I want good natural light"** — which is decided by orientation, floor, obstruction and window ratio, *none of which the user typed*. A keyword search matches the phrase "big windows"; Deephome translates **surface words → true intent → queryable attributes**.
 
----
+This is a non-profit, open-source tool. No ads, no data resale — just a better way to search.
 
-## 快速运行（离线、零 key、零依赖）
+## The idea, in one example
 
-```bash
-cd deephome-claude
+Query: **"big windows / good light"**
 
-# 方式 A：tsx（若本机 tsx 可用）
-npx tsx demo.ts
+| | Naive keyword search | Deephome (intent) |
+|---|---|---|
+| Top result | a **north-facing, 3rd-floor** unit whose listing text literally says "big windows" | a **south-facing, 28th-floor** unit with floor-to-ceiling glass |
+| Why | matched the phrase | reconstructed *good light* → ranked by orientation + floor + window ratio |
 
-# 方式 B：用仓库自带的 tsc 编译后运行（最稳）
-npm run build:run
-#   等价于：
-#   npx tsc demo.ts src/globals.d.ts --outDir dist --module commonjs \
-#       --target es2020 --moduleResolution node --skipLibCheck --esModuleInterop
-#   node dist/demo.js
+The same phrase under a **different** intent ("big windows / great **view**") ranks a high-floor north unit first — because a view depends on floor, not sun. Same words, different intent, opposite ranking. No keyword or pure-vector search does this.
 
-# 自定义查询
-npx tsx demo.ts "养狗 安静 近地铁 一房 预算80万"
-```
+## How it works
 
-演示会打印：**意图帧 → 查询计划 → 排序结果（含每套房的"为什么"）**，
-并用一个"朴素关键词搜索 vs Deephome 意图搜索"的对比，证明字面命中 ≠ 最优匹配。
+A layered pipeline whose core asset is an **auditable Intent Knowledge Base** (surface → intent → weighted attributes):
 
----
+- **Layer 1 — Intent understanding.** LLM-pluggable front-end (with a deterministic offline fallback) grounded by the Knowledge Base. Handles novel phrasing, negation, ambiguity, and asks a clarifying question only when intent genuinely forks.
+- **Layer 2 — Intent → attribute planning.** Expands each intent into hard filters + weighted soft signals + text/image concepts + neighborhood signals.
+- **Layer 3 — Hybrid retrieval.** Structured + full-text + AI image + places — because a single intent's evidence is scattered across all four.
+- **Layer 4 — Transparent ranking.** A linear, explainable fusion; every point traces back to an intent and an attribute. (A cross-encoder re-ranker is an optional top-K polish, never a replacement.)
+- **Layer 0 — Enrichment.** Turns raw MLS (remarks + basic fields + photos) into the attributes intents need — orientation, floor, ceiling height, pet policy, and a **photo-derived window ratio** — each with a source and confidence.
 
-## 接入真实 LLM（生产的意图理解前端）
+Full design and rationale: [`DESIGN.md`](./DESIGN.md).
 
-意图引擎的 LLM 是**可插拔**的。实现一个 `LLMAdapter` 注入即可，KB 依然掌管"意图→属性"：
-
-```ts
-import { search } from "./src/pipeline";
-import type { LLMAdapter } from "./src/llm";
-
-const claude: LLMAdapter = {
-  async complete(prompt) {
-    const r = await anthropic.messages.create({
-      model: "claude-sonnet-5",
-      max_tokens: 1024,
-      messages: [{ role: "user", content: prompt }],
-    });
-    return r.content[0].type === "text" ? r.content[0].text : "";
-  },
-};
-
-const result = await search("想要大窗户 采光好 的公寓", { llm: claude });
-```
-
-不传 `llm` 时自动走**确定性回退**（基于 KB 线索词），无需任何 key 也能跑。
-
----
-
-## 接入真实房源数据（Repliers）
-
-数据源也是可插拔的（`ListingSource`）。真实房源需 Repliers key + MLS 授权：
-
-```ts
-import { search } from "./src/pipeline";
-import { RepliersSource } from "./src/sources";
-
-const source = new RepliersSource(process.env.REPLIERS_API_KEY!);
-const result = await search("安静 近地铁 一房", { source });
-```
-
-- 免费 **Preview 档**：可跑通全流程，但只对 **sample data**（适合搭建/验证意图引擎）。
-- 真实在售/在租房源：需 **Standard（$199/月）+ 牌照授权**。
-
----
-
-## 目录结构
-
-```
-deephome-claude/
-├── DESIGN.md            设计文档（第一性原理 + 市场对标 + 最优方案论证）
-├── demo.ts              可运行演示
-└── src/
-    ├── types.ts         核心数据模型
-    ├── intentKB.ts      ★ 意图知识库（产品核心资产：意图 → 属性 映射）
-    ├── intentEngine.ts  意图理解（LLM 前端 + 确定性回退）
-    ├── llm.ts           LLM 适配器接口 + grounding prompt
-    ├── planner.ts       意图帧 → 查询计划
-    ├── sources.ts       数据源接口 + 本地/Repliers 适配器
-    ├── ranking.ts       混合打分 + 透明融合 + 解释生成
-    ├── pipeline.ts      端到端编排
-    └── sampleData.ts    14 套多伦多样例房源
-```
-
-## 设计要点（一句话版）
-
-- **核心资产是意图知识库**，不是一段 prompt。它可审计、可改进、可解释。
-- **LLM 做模糊映射，KB 做属性展开**：兼得灵活性与可控性。
-- **混合检索**（结构化 + 文本 + 图片 + 地点）：单一信号覆盖不全一个意图。
-- **透明线性排序**：可解释是灵魂，黑盒 rerank 只做可选精修。
-- **数据源 / LLM 全可插拔**：先用免费档证明价值，再决定是否上真实房源。
-
----
-
-## 富化管线 (Layer 0) —— 让意图能落在真实 MLS 上
-
-意图排序依赖 `exposure / floor / windowExposurePct / ceilingHeightFt / petsAllowed` 等字段，
-但真实 MLS 只稳定给一部分。`src/enrich.ts` 负责把**原始 MLS(remarks + 基础字段 + 图片标签)**
-派生成完整的可意图化房源，且**每个派生字段都带来源与置信度**(provenance)，延续可解释基因。
+## Quickstart (offline, no API keys)
 
 ```bash
-npx tsx demo-enrich.ts     # 展示 原始MLS → 富化(带来源/置信度) → 意图排序仍成立
+npm install
+npx tsx demo.ts          # intent search — surface words vs true intent
+npx tsx demo-enrich.ts   # raw MLS → enriched attributes (with provenance)
+npx tsx demo-vision.ts   # window ratio from photos, not wording
 ```
 
-- 确定性文本抽取器（正则/关键词）：朝向、层高、可养宠、开窗比例、阳台——现在就能离线跑。
-- 视觉/LLM 抽取做成可插拔接口 `VisionAdapter`：生产接 Repliers Image Insights 覆盖开窗比例估计。
+Everything runs on bundled sample data with zero keys. Use `npm run build:run` if `tsx` isn't available.
 
-新增文件：`src/enrich.ts`(富化管线)、`src/rawSample.ts`(原始MLS样例)、`demo-enrich.ts`(演示)。
+## Real data (Repliers)
 
-### 视觉抽取：开窗比例从照片来（不是措辞猜）
+Data sources are pluggable (`ListingSource`). There is **no free, redistributable full MLS feed** in Canada — MLS data is licensed by CREA and local boards. Practical paths:
 
-措辞会骗人——文案吹「big windows」但照片其实普通窗；或文案没提但照片是整面落地窗。
-`src/vision.ts` 的 `VisionAdapter` 把「开窗比例」交给真实照片信号，并以更高置信度**覆盖**措辞猜测：
+- **Repliers** free *Preview* tier lets you build and validate the whole engine on sample data; real listings need the paid tier **plus** an MLS/brokerage authorization.
+- The photo-based window signal uses Repliers **AI Image Search** (available on the free tier). Swap in one line: `enrich(raw, { vision: new RepliersVisionAdapter({ apiKey }) })`.
 
-```bash
-npx tsx demo-vision.ts     # 演示：文案 vs 照片不一致时，以照片为准（可上修/下修）
-```
+## Status & roadmap
 
-- `RepliersVisionAdapter`：用 Repliers **AI Image Search**（免费 Preview 档）对真实照片打分 → 开窗比例。
-- `MockVisionAdapter`：离线模拟照片视觉，用于 demo/测试。
+Working prototype (algorithm + runnable proof). Next: an evaluation harness (LLM-as-judge) to quantify every change, batched photo scoring, and a learning loop that turns user corrections into Knowledge-Base improvements.
 
-生产切换只需一行：`enrich(raw, { vision: new RepliersVisionAdapter({ apiKey }) })`。
+## License
+
+Non-profit and open-source. See `LICENSE` (to be added).

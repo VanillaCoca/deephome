@@ -1,9 +1,9 @@
 {
-  "name": "deephome-claude",
+  "name": "deephome",
   "version": "0.1.0",
   "private": true,
   "type": "commonjs",
-  "description": "Deephome intent search prototype — recover the user's true intent from surface search words, then map it to queryable listing attributes.",
+  "description": "Deephome — intent-based home search. Recover the user's true intent from surface search words, then map it to queryable listing attributes.",
   "scripts": {
     "demo": "tsx demo.ts",
     "demo:enrich": "tsx demo-enrich.ts",
