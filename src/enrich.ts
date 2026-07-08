@@ -47,7 +47,7 @@ export type EnrichReport = Record<string, FieldTrace>;
 
 // 生产可注入：从照片估计开窗比例 / 补充标签（如 Repliers Image Insights）。
 export interface VisionAdapter {
-  analyze(photoRefs: string[]): Promise<{ windowExposurePct?: number; tags?: string[] }>;
+  analyze(raw: RawListing): Promise<{ windowExposurePct?: number; tags?: string[]; note?: string }>;
 }
 
 // ---------------- 各字段抽取器 ----------------
@@ -135,7 +135,6 @@ function extractBalcony(raw: RawListing): FieldTrace {
 // ---------------- 主入口 ----------------
 export interface EnrichOptions {
   vision?: VisionAdapter;
-  visionRefs?: (raw: RawListing) => string[]; // 如何取该房源的图片引用
 }
 
 export async function enrich(raw: RawListing, opts: EnrichOptions = {}): Promise<{ listing: Listing; report: EnrichReport }> {
@@ -148,10 +147,9 @@ export async function enrich(raw: RawListing, opts: EnrichOptions = {}): Promise
 
   // 视觉模型（若注入）覆盖开窗比例——更高置信度。
   if (opts.vision) {
-    const refs = opts.visionRefs ? opts.visionRefs(raw) : [];
-    const v = await opts.vision.analyze(refs);
+    const v = await opts.vision.analyze(raw);
     if (typeof v.windowExposurePct === "number") {
-      windowPct = { value: round2(v.windowExposurePct), source: "photos", confidence: 0.85, note: "视觉模型估计" };
+      windowPct = { value: round2(v.windowExposurePct), source: "photos", confidence: 0.85, note: v.note ?? "视觉模型估计（来自照片）" };
     }
   }
 
