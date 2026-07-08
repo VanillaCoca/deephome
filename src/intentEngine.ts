@@ -26,8 +26,9 @@ function parseLiterals(q: string): IntentItem[] {
   // 卧室数：支持 "2 bed" / "两房" / "3卧"
   const bed = lower.match(/(\d+)\s*(?:\+)?\s*(?:bed|bd|bedroom|房|卧|居)/);
   if (bed) lit.minBeds = parseInt(bed[1], 10);
-  const zhBed = q.match(/([一二三四五])\s*(?:房|卧|居室)/);
-  if (zhBed && !bed) lit.minBeds = "一二三四五".indexOf(zhBed[1]) + 1;
+  const ZH_NUM: Record<string, number> = { 一: 1, 两: 2, 俩: 2, 二: 2, 三: 3, 四: 4, 五: 5, 六: 6 };
+  const zhBed = q.match(/([一二两俩三四五六])\s*(?:房|卧|居室|睡房|居)/);
+  if (zhBed && !bed) lit.minBeds = ZH_NUM[zhBed[1]];
 
   // 预算： "800k" / "under 900000" / "80万"
   const k = lower.match(/(\d+(?:\.\d+)?)\s*k\b/);

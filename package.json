@@ -8,6 +8,8 @@
     "demo": "tsx demo.ts",
     "demo:enrich": "tsx demo-enrich.ts",
     "demo:vision": "tsx demo-vision.ts",
+    "demo:repliers": "tsx demo-repliers.ts",
+    "eval": "tsx eval.ts",
     "build": "tsc demo.ts demo-enrich.ts demo-vision.ts src/globals.d.ts --outDir dist --module commonjs --target es2020 --moduleResolution node --skipLibCheck --esModuleInterop",
     "build:run": "npm run build && node dist/demo.js && node dist/demo-enrich.js && node dist/demo-vision.js"
   }

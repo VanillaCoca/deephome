@@ -1,0 +1,117 @@
+{
+  "cases": [
+    {
+      "id": "light",
+      "query": "想要大窗户 采光好 的公寓",
+      "ndcg": 1,
+      "top": [
+        {
+          "mls": "C001",
+          "grade": 3
+        },
+        {
+          "mls": "C010",
+          "grade": 3
+        },
+        {
+          "mls": "C003",
+          "grade": 2
+        },
+        {
+          "mls": "C013",
+          "grade": 2
+        },
+        {
+          "mls": "C006",
+          "grade": 1
+        }
+      ]
+    },
+    {
+      "id": "view",
+      "query": "高层 景观好 yorkville",
+      "ndcg": 1,
+      "top": [
+        {
+          "mls": "C012",
+          "grade": 3
+        },
+        {
+          "mls": "C003",
+          "grade": 2
+        }
+      ]
+    },
+    {
+      "id": "quiet_commute",
+      "query": "安静 近地铁 的一房",
+      "ndcg": 0.7061804877359824,
+      "top": [
+        {
+          "mls": "C009",
+          "grade": 2
+        },
+        {
+          "mls": "C004",
+          "grade": 3
+        },
+        {
+          "mls": "C006",
+          "grade": 1
+        },
+        {
+          "mls": "C008",
+          "grade": 0
+        },
+        {
+          "mls": "C001",
+          "grade": 0
+        }
+      ]
+    },
+    {
+      "id": "family",
+      "query": "适合小孩的家庭 独立屋 leslieville",
+      "ndcg": 1,
+      "top": [
+        {
+          "mls": "C005",
+          "grade": 3
+        },
+        {
+          "mls": "C014",
+          "grade": 1
+        }
+      ]
+    },
+    {
+      "id": "pet_value",
+      "query": "养狗 高性价比 公寓",
+      "ndcg": 0.7591919243197319,
+      "top": [
+        {
+          "mls": "C006",
+          "grade": 2
+        },
+        {
+          "mls": "C009",
+          "grade": 1
+        },
+        {
+          "mls": "C011",
+          "grade": 3
+        },
+        {
+          "mls": "C001",
+          "grade": 0
+        },
+        {
+          "mls": "C010",
+          "grade": 0
+        }
+      ]
+    }
+  ],
+  "meanNdcg": 0.8930744824111428,
+  "k": 5
+}
