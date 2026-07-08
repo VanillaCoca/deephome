@@ -1,0 +1,13 @@
+{
+  "name": "deephome-claude",
+  "version": "0.1.0",
+  "private": true,
+  "type": "commonjs",
+  "description": "Deephome intent search prototype — recover the user's true intent from surface search words, then map it to queryable listing attributes.",
+  "scripts": {
+    "demo": "tsx demo.ts",
+    "demo:enrich": "tsx demo-enrich.ts",
+    "build": "tsc demo.ts demo-enrich.ts src/globals.d.ts --outDir dist --module commonjs --target es2020 --moduleResolution node --skipLibCheck --esModuleInterop",
+    "build:run": "npm run build && node dist/demo.js && node dist/demo-enrich.js"
+  }
+}
