@@ -49,6 +49,7 @@ export interface Listing {
   remarks: string; // 房源自由文本（BM25 / 语义分支使用）
   photoTags: string[]; // 图片洞察标签（作为 Repliers AI 图搜的离线替身）
   nearby: Poi[]; // 来自 Places 端点的富化数据
+  images?: string[]; // 照片路径（Repliers 为相对路径，前缀 https://cdn.repliers.io/）
 }
 
 // ---------- 意图帧（Intent Frame）：意图理解层的输出 ----------
@@ -63,6 +64,7 @@ export interface LiteralConstraints {
   propertyType?: string;
   type?: "sale" | "lease";
   minBeds?: number;
+  minBaths?: number;
   maxPrice?: number;
   minPrice?: number;
   minParking?: number;

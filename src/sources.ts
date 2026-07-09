@@ -18,6 +18,7 @@ function passesHard(l: Listing, h: LiteralConstraints): boolean {
   if (h.propertyType && l.propertyType !== h.propertyType) return false;
   if (h.type && l.type !== h.type) return false;
   if (h.minBeds && l.beds < h.minBeds) return false;
+  if (h.minBaths && l.baths < h.minBaths) return false;
   if (h.maxPrice && l.price > h.maxPrice) return false;
   if (h.minPrice && l.price < h.minPrice) return false;
   if (h.minParking && l.parking < h.minParking) return false;
@@ -111,5 +112,6 @@ function mapRepliersListing(r: any): Listing {
     remarks: d.description ?? "",
     photoTags: [],
     nearby: [], // 由 /places 端点富化（付费）
+    images: Array.isArray(r.images) ? r.images : [],
   };
 }
