@@ -17,7 +17,8 @@ const SYSTEM = `你是 Deephome 的找房助手（多伦多）。你的任务是
 2. 调用工具时，把【软性意图】放进 intent（自由文本，如"采光好 安静 能养狗"），把【硬约束】放进各自字段（type / minBeds / minBaths / maxPrice / city…）。不要把"两房""预算80万"塞进 intent。
 3. 【非常重要】搜索结果会显示在用户右侧的舞台上。**绝不要在回复里逐条列出房源**。用一两句话概括，可以点名其中一两套（例如"最亮的是 Liberty Village 那套，朝南 28 楼"），并说明你是按什么排序的。
 4. 用户 refine 时（"便宜点""再安静些""换成租的"），重新调用工具，带上累积后的完整条件。
-5. 中文回复，简洁、专业、温和。不用 emoji。回复控制在 2-3 句。`;
+5. 当系统提示"用户正在看某套房"时，用户说"这个""这套""类似的"多半指的就是它。以那套房的属性为基准来搜（例如"有便宜点的吗" = 同小区/同户型但更低价）。把参照信息放进 search_listings 的字段（如 maxPrice 取那套房价格的九折、city/neighborhood 沿用、intent 沿用它的卖点）。
+6. 中文回复，简洁、专业、温和。不用 emoji。回复控制在 2-3 句。`;
 
 const SEARCH_TOOL = {
   name: "search_listings",
@@ -69,11 +70,26 @@ export interface ChatTurnResult {
   fallback?: boolean; // 未配置 Bedrock key 时，退回确定性引擎
 }
 
+// 用户此刻正在详情层看的房源（若有）—— 让对话能引用舞台上的对象
+export interface FocusedListing {
+  mlsNumber: string;
+  neighborhood: string;
+  city: string;
+  type: "sale" | "lease";
+  price: number;
+  beds: number;
+  baths: number;
+  exposure: string | null;
+  propertyType: string;
+}
+
 export async function chatTurn(input: {
   history: TurnMessage[];
   userText: string;
   defaultType?: "sale" | "lease";
-  useLLM?: boolean; // false = 强制走确定性引擎（未登录用户 / 成本闸门）
+  focused?: FocusedListing | null;
+  useLLM?: boolean; // false = 强制走确定性引擎（未登录 / 超额 等成本闸门）
+  fallbackNote?: string; // 降级时向用户解释原因
 }): Promise<ChatTurnResult> {
   // 优雅降级：没有 Bedrock key、或调用方不允许用 LLM 时，把原文交给确定性意图引擎。
   // 这正是"LLM 可插拔、KB 才是核心"的架构红利 —— 匿名用户依然拿到完整的意图搜索。
@@ -88,7 +104,7 @@ export async function chatTurn(input: {
     });
     const note = !hasKey
       ? "（未配置 Bedrock key，当前由确定性规则引擎理解意图）"
-      : "（登录后可启用 AI 对话理解；当前由确定性规则引擎理解意图）";
+      : input.fallbackNote ?? "（登录后可启用 AI 对话理解；当前由确定性规则引擎理解意图）";
     return {
       text: r.count ? `${r.intent.summary || ""} 我在右侧列出了 ${r.count} 套。${note}`.trim() : `没有符合条件的房源，换个说法试试？${note}`,
       search: r,
@@ -101,9 +117,14 @@ export async function chatTurn(input: {
     { role: "user" as const, content: input.userText },
   ];
 
-  const system = input.defaultType
+  let system = input.defaultType
     ? `${SYSTEM}\n\n当前界面上的买/租开关是：${input.defaultType === "lease" ? "租(lease)" : "买(sale)"}。用户没有明说时以此为准。`
     : SYSTEM;
+
+  if (input.focused) {
+    const f = input.focused;
+    system += `\n\n【用户正在看这套房】${f.neighborhood}·${f.city} · ${f.type === "lease" ? "租" : "买"} · $${f.price} · ${f.beds}房${f.baths}卫 · 朝${f.exposure ?? "?"} · ${f.propertyType} · MLS ${f.mlsNumber}。用户说"这个/这套/类似的"时多半指它。`;
+  }
 
   // 第一跳：模型决定是否调用工具
   const first = await bedrockChat({ system, messages, tools: [SEARCH_TOOL], maxTokens: 1024 });

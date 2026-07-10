@@ -43,10 +43,24 @@ export default function Home() {
     const history = messages.map((m) => ({ role: m.role, text: m.text }));
     setMessages((m) => [...m, { role: "user", text }]);
     try {
+      // 把"当前正在看的房源"作为上下文一起发出去 —— 让对话能引用舞台上的对象
+      const focused = detail
+        ? {
+            mlsNumber: detail.mlsNumber,
+            neighborhood: detail.neighborhood,
+            city: detail.city,
+            type: detail.type,
+            price: detail.price,
+            beds: detail.beds,
+            baths: detail.baths,
+            exposure: detail.exposure,
+            propertyType: detail.propertyType,
+          }
+        : null;
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: history, text, type }),
+        body: JSON.stringify({ messages: history, text, type, focused }),
       });
       const data = (await res.json()) as { text?: string; search?: WebSearchResult | null; error?: string };
       if (data.error) throw new Error(data.error);

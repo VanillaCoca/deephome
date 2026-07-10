@@ -34,14 +34,26 @@ export function ListingDetail({
 
   return (
     <div>
-      <button
-        type="button"
-        onClick={onBack}
-        className="mb-5 inline-flex items-center gap-1.5 rounded-full border border-neutral-200 bg-white px-3 py-1.5 text-sm text-neutral-600 transition hover:border-neutral-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900"
-      >
-        ← {backLabel}
-        <kbd className="ml-1 rounded border border-neutral-200 px-1 text-[10px] text-neutral-400">Esc</kbd>
-      </button>
+      <div className="mb-5 flex items-center justify-between gap-3">
+        <button
+          type="button"
+          onClick={onBack}
+          className="inline-flex items-center gap-1.5 rounded-full border border-neutral-200 bg-white px-3 py-1.5 text-sm text-neutral-600 transition hover:border-neutral-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900"
+        >
+          ← {backLabel}
+          <kbd className="ml-1 rounded border border-neutral-200 px-1 text-[10px] text-neutral-400">Esc</kbd>
+        </button>
+
+        {/* 深链是"选择"，不是强制：默认在同舞台看，这里提供新标签/分享入口 */}
+        <a
+          href={`/listing/${encodeURIComponent(l.mlsNumber)}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1.5 rounded-full border border-neutral-200 bg-white px-3 py-1.5 text-sm text-neutral-500 transition hover:border-neutral-400 hover:text-neutral-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900"
+        >
+          新标签打开 ↗
+        </a>
+      </div>
 
       <div className="grid grid-cols-4 gap-2 overflow-hidden rounded-2xl">
         {/* eslint-disable-next-line @next/next/no-img-element */}
