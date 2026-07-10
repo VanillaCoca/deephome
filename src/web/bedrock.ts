@@ -24,8 +24,8 @@ export interface BedrockChatInput {
 
 // 返回 Anthropic 原始响应：{ id, content:[...], stop_reason, usage, ... }
 export async function bedrockChat(input: BedrockChatInput): Promise<any> {
-  const key = process.env.AWS_BEARER_TOKEN_BEDROCK;
-  if (!key) throw new Error("缺少环境变量 AWS_BEARER_TOKEN_BEDROCK（把 Bedrock API key 放到 .env）");
+  const key = bedrockKey();
+  if (!key) throw new Error("缺少 Bedrock API key（在 .env 设 AWS_BEARER_TOKEN_BEDROCK 或 AWS_BEDROCK_API_KEY）");
 
   const body: any = {
     anthropic_version: "bedrock-2023-05-31",
@@ -73,6 +73,14 @@ export function bedrockLLMAdapter() {
       return textOf(r);
     },
   };
+}
+
+// 兼容两种命名：AWS_BEARER_TOKEN_BEDROCK（AI SDK 约定）或 AWS_BEDROCK_API_KEY
+export function bedrockKey(): string | undefined {
+  return process.env.AWS_BEARER_TOKEN_BEDROCK || process.env.AWS_BEDROCK_API_KEY;
+}
+export function hasBedrockKey(): boolean {
+  return Boolean(bedrockKey());
 }
 
 export const bedrockModelInfo = { region: REGION, modelId: MODEL_ID, endpoint: ENDPOINT };

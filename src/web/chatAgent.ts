@@ -2,7 +2,7 @@
 // 关键契约：**文字进对话，结果进舞台**。工具结果只回传「摘要」给模型，
 // 从机制上阻止它在气泡里逐条列房源（见 UX_SPEC 的"明令禁止"）。
 
-import { bedrockChat, textOf, toolUsesOf, type BedrockMessage } from "./bedrock";
+import { bedrockChat, textOf, toolUsesOf, hasBedrockKey, type BedrockMessage } from "./bedrock";
 import { runSearch, type WebSearchResult, type WebFilters } from "./searchService";
 
 export interface TurnMessage {
@@ -93,7 +93,7 @@ export async function chatTurn(input: {
 }): Promise<ChatTurnResult> {
   // 优雅降级：没有 Bedrock key、或调用方不允许用 LLM 时，把原文交给确定性意图引擎。
   // 这正是"LLM 可插拔、KB 才是核心"的架构红利 —— 匿名用户依然拿到完整的意图搜索。
-  const hasKey = Boolean(process.env.AWS_BEARER_TOKEN_BEDROCK);
+  const hasKey = hasBedrockKey();
   const useLLM = hasKey && input.useLLM !== false;
 
   if (!useLLM) {
