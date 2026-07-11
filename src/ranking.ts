@@ -10,7 +10,7 @@
 // 大窗在照片、而这些没有任何一个单独够用。所以混合是必需，不是装饰。
 
 import type {
-  Listing, QueryPlan, ScoredListing, Explanation, ScoreBreakdown, PlacesSignal,
+  Listing, QueryPlan, ScoredListing, Explanation, ScoreBreakdown, PlacesSignal, AnchorSignal,
 } from "./types";
 import { CONCEPT_BY_ID } from "./intentKB";
 
@@ -84,6 +84,13 @@ function scorePlaces(l: Listing, plan: QueryPlan): { score: number; reasons: Map
   return { score: den ? num / den : 0, reasons };
 }
 
+// 邻近锚点分支：到用户指定点的距离，越近越高。
+// 衰减：0m→1，halfDistM→0.5，2×halfDistM→0.33…（软性偏好，不做硬性排除）。
+function scoreAnchor(l: Listing, a: AnchorSignal): { score: number; km: number } {
+  const d = haversineM(l.lat, l.lng, a.lat, a.lng);
+  return { score: clamp01(1 / (1 + d / a.halfDistM)), km: d / 1000 };
+}
+
 function placeSat(l: Listing, p: PlacesSignal): { sat: number; nearest: string | null; dist: number } {
   const pois = l.nearby.filter((n) => n.kind === p.kind);
   if (!pois.length) return { sat: p.want ? 0.2 : 1, nearest: null, dist: Infinity };
@@ -106,11 +113,20 @@ export function rank(candidates: Listing[], plan: QueryPlan): ScoredListing[] {
     const tx = scoreText(l, plan);
     const im = scoreImage(l, plan);
     const pl = scorePlaces(l, plan);
+    const an = plan.anchor ? scoreAnchor(l, plan.anchor) : { score: 0, km: Infinity };
     const final =
-      bw.structured * st.score + bw.text * tx + bw.image * im + bw.places * pl.score;
+      bw.structured * st.score + bw.text * tx + bw.image * im + bw.places * pl.score + bw.anchor * an.score;
 
-    const score: ScoreBreakdown = { structured: st.score, text: tx, image: im, places: pl.score, final };
+    const score: ScoreBreakdown = { structured: st.score, text: tx, image: im, places: pl.score, anchor: an.score, final };
     const explanations = buildExplanations(mergeReasons(st.reasons, pl.reasons));
+    // 锚点命中时，把「离 X 近」作为最靠前的解释亮出来
+    if (plan.anchor && an.score > 0.15) {
+      explanations.unshift({
+        conceptId: "near_anchor",
+        conceptLabel: `离${plan.anchor.label}近`,
+        reasons: [`约 ${an.km.toFixed(1)} km`],
+      });
+    }
     return { listing: l, score, explanations };
   });
   return scored.sort((a, b) => b.score.final - a.score.final);
@@ -122,13 +138,15 @@ function branchWeights(plan: QueryPlan) {
     text: sum(plan.textTerms.map((t) => t.weight)),
     image: sum(plan.imageConcepts.map((i) => i.weight)),
     places: sum(plan.placesSignals.map((p) => p.weight)),
+    anchor: plan.anchor ? plan.anchor.weight : 0, // 无锚点=0，不影响既有基线
   };
-  const total = raw.structured + raw.text + raw.image + raw.places || 1;
+  const total = raw.structured + raw.text + raw.image + raw.places + raw.anchor || 1;
   return {
     structured: raw.structured / total,
     text: raw.text / total,
     image: raw.image / total,
     places: raw.places / total,
+    anchor: raw.anchor / total,
   };
 }
 

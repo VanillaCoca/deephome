@@ -18,6 +18,8 @@ export interface WebFilters {
   minPrice?: number;
   maxPrice?: number;
   minParking?: number;
+  // 邻近锚点（「离 X 近」）：不是硬约束，走排序软信号；由地点联想选中后带上 lat/lng。
+  near?: { lat: number; lng: number; label: string };
 }
 
 export interface WebReason { concept: string; points: string[]; }
@@ -71,12 +73,20 @@ export async function runSearch(input: RunSearchInput): Promise<WebSearchResult>
   const p = buildPlan(frame);
 
   // 2) 合并硬约束：Header 的结构化 filter 覆盖意图里解析出的 literal
+  //    注意：near 不是硬约束（不参与过滤），单独走排序锚点，故排除在外。
   const hard: LiteralConstraints = { ...p.hardFilters };
   (Object.keys(filters) as (keyof WebFilters)[]).forEach((k) => {
+    if (k === "near") return;
     const v = filters[k];
     if (v !== undefined && v !== null && (v as unknown) !== "") (hard as any)[k] = v;
   });
   p.hardFilters = hard;
+
+  // 2b) 邻近锚点：用户显式选了「离 X 近」→ 加一个距离排序分支（越近越高）。
+  //     用户主动选点，给较强权重；halfDistM=3km 作为衰减尺度（3km 处约 0.5 分）。
+  if (filters.near && Number.isFinite(filters.near.lat) && Number.isFinite(filters.near.lng)) {
+    p.anchor = { lat: filters.near.lat, lng: filters.near.lng, label: filters.near.label || "选定地点", weight: 2.0, halfDistM: 3000 };
+  }
 
   // 3) 数据源（sample 默认；repliers 需 apiKey，由服务端注入）
   const source: ListingSource =
@@ -96,7 +106,7 @@ export async function runSearch(input: RunSearchInput): Promise<WebSearchResult>
     count: candidates.length,
     results: ranked.map(toWebListing),
     source: sourceKind,
-    filters: hard as WebFilters,
+    filters: { ...(hard as WebFilters), ...(filters.near ? { near: filters.near } : {}) },
   };
 }
 

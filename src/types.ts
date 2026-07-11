@@ -128,12 +128,23 @@ export interface PlacesSignal {
   radiusM: number;
 }
 
+// 邻近锚点：用户显式选中的一个地点（大学 / 公司 / 地标），排序时「越近越高」。
+// 与 placesSignals 不同——那是「附近有没有某类 POI」，这是「离我指定的这个点多近」。
+export interface AnchorSignal {
+  lat: number;
+  lng: number;
+  label: string; // 展示用，如「多伦多大学」
+  weight: number; // 融合时的分支权重（用户显式选点，给较强的权重）
+  halfDistM: number; // 距此距离时约得 0.5 分（距离衰减尺度）
+}
+
 export interface QueryPlan {
   hardFilters: LiteralConstraints;
   softSignals: SoftSignal[];
   textTerms: TextTerm[];
   imageConcepts: ImageConcept[];
   placesSignals: PlacesSignal[];
+  anchor?: AnchorSignal; // 可选：仅当用户选了「离 X 近」时存在
   intentSummary: string; // 「我把你的X理解为想要Y，正在按 a/b/c 排序」
 }
 
@@ -144,6 +155,7 @@ export interface ScoreBreakdown {
   text: number;
   image: number;
   places: number;
+  anchor?: number; // 邻近锚点分支（仅当有锚点时）
   final: number;
 }
 

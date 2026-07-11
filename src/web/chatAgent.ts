@@ -137,6 +137,7 @@ export async function chatTurn(input: {
   if (base.propertyType) lockedBits.push(`房型 ${base.propertyType}`);
   if (base.city) lockedBits.push(`城市 ${base.city}`);
   if (base.neighborhood) lockedBits.push(`区域 ${base.neighborhood}`);
+  if (base.near) lockedBits.push(`离「${base.near.label}」近（已按距离排序）`);
   if (lockedBits.length) {
     system += `\n\n【用户已用筛选器锁定这些硬条件，必须照做、不要追问】${lockedBits.join("、")}。这些条件系统会强制生效，你只需理解剩下的软性意图。`;
   }

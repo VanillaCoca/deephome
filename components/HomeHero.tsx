@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ArrowUpIcon, ArrowRightIcon, ChevronDownIcon, CheckIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { WebFilters } from "@/src/web/searchService";
+import { LocationPill, type SelectedPlace } from "./LocationPill";
 
 // 首页轮播打字的占位示例
 const PLACEHOLDERS = [
@@ -215,6 +216,7 @@ export function HomeHero({
   const typed = useTypewriter(PLACEHOLDERS, !value && !focused);
 
   // 结构化硬约束
+  const [place, setPlace] = useState<SelectedPlace | null>(null);
   const [minBeds, setMinBeds] = useState<number | undefined>();
   const [minBaths, setMinBaths] = useState<number | undefined>();
   const [maxPrice, setMaxPrice] = useState<number | undefined>();
@@ -231,6 +233,8 @@ export function HomeHero({
 
   const buildFilters = (): WebFilters => {
     const f: WebFilters = {};
+    if (place?.city) f.city = place.city;
+    if (place?.near) f.near = place.near;
     if (minBeds) f.minBeds = minBeds;
     if (minBaths) f.minBaths = minBaths;
     if (maxPrice) f.maxPrice = maxPrice;
@@ -241,6 +245,8 @@ export function HomeHero({
   // 当意图框为空、只设了筛选时，用筛选拼一句可读的话当作聊天气泡
   const summarizeFilters = (f: WebFilters) => {
     const parts = [type === "lease" ? "租" : "买"];
+    if (place?.near) parts.push(`离${place.near.label}近`);
+    else if (f.city) parts.push(f.city);
     if (f.propertyType) parts.push(PT_LABEL[f.propertyType] ?? f.propertyType);
     if (f.minBeds) parts.push(`${f.minBeds}室起`);
     if (f.minBaths) parts.push(`${f.minBaths}卫起`);
@@ -320,6 +326,8 @@ export function HomeHero({
               </button>
             ))}
           </div>
+
+          <LocationPill place={place} onChange={setPlace} openKey={openKey} setOpenKey={setOpenKey} />
 
           <Pill label={minBeds ? `${minBeds}+ 室` : "卧室"} active={!!minBeds} panelKey="beds" openKey={openKey} setOpenKey={setOpenKey}>
             <Option label="不限" selected={!minBeds} onPick={() => { setMinBeds(undefined); setOpenKey(null); }} />
