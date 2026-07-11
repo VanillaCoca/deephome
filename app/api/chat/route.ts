@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { chatTurn, type TurnMessage, type FocusedListing } from "../../../src/web/chatAgent";
+import type { WebFilters } from "../../../src/web/searchService";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -40,6 +41,7 @@ export async function POST(req: Request) {
       text?: string;
       type?: "sale" | "lease";
       focused?: FocusedListing | null;
+      filters?: WebFilters | null;
     };
     if (!body.text?.trim()) return NextResponse.json({ error: "缺少 text" }, { status: 400 });
 
@@ -49,6 +51,7 @@ export async function POST(req: Request) {
       userText: body.text.trim(),
       defaultType: body.type,
       focused: body.focused ?? null,
+      baseFilters: body.filters ?? null,
       useLLM: g.useLLM,
       fallbackNote: g.note,
     });

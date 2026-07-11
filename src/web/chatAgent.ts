@@ -90,7 +90,10 @@ export async function chatTurn(input: {
   focused?: FocusedListing | null;
   useLLM?: boolean; // false = 强制走确定性引擎（未登录 / 超额 等成本闸门）
   fallbackNote?: string; // 降级时向用户解释原因
+  baseFilters?: WebFilters | null; // 首页 filter bar 的显式硬约束 —— 权威，覆盖 LLM/解析结果
 }): Promise<ChatTurnResult> {
+  // 显式硬约束（来自结构化 filter bar）：始终以它为准，spread 在最后覆盖一切。
+  const base: WebFilters = { ...(input.defaultType ? { type: input.defaultType } : {}), ...(input.baseFilters ?? {}) };
   // 优雅降级：没有 Bedrock key、或调用方不允许用 LLM 时，把原文交给确定性意图引擎。
   // 这正是"LLM 可插拔、KB 才是核心"的架构红利 —— 匿名用户依然拿到完整的意图搜索。
   const hasKey = hasBedrockKey();
@@ -99,7 +102,7 @@ export async function chatTurn(input: {
   if (!useLLM) {
     const r = await runSearch({
       intent: input.userText,
-      filters: input.defaultType ? ({ type: input.defaultType } as WebFilters) : {},
+      filters: base,
       topK: 24,
     });
     const note = !hasKey
@@ -126,6 +129,18 @@ export async function chatTurn(input: {
     system += `\n\n【用户正在看这套房】${f.neighborhood}·${f.city} · ${f.type === "lease" ? "租" : "买"} · $${f.price} · ${f.beds}房${f.baths}卫 · 朝${f.exposure ?? "?"} · ${f.propertyType} · MLS ${f.mlsNumber}。用户说"这个/这套/类似的"时多半指它。`;
   }
 
+  // 结构化 filter bar 已锁定的硬约束：告诉模型，避免它再追问或推翻
+  const lockedBits: string[] = [];
+  if (base.minBeds) lockedBits.push(`至少 ${base.minBeds} 室`);
+  if (base.minBaths) lockedBits.push(`至少 ${base.minBaths} 卫`);
+  if (base.maxPrice) lockedBits.push(`预算上限 $${base.maxPrice.toLocaleString()}`);
+  if (base.propertyType) lockedBits.push(`房型 ${base.propertyType}`);
+  if (base.city) lockedBits.push(`城市 ${base.city}`);
+  if (base.neighborhood) lockedBits.push(`区域 ${base.neighborhood}`);
+  if (lockedBits.length) {
+    system += `\n\n【用户已用筛选器锁定这些硬条件，必须照做、不要追问】${lockedBits.join("、")}。这些条件系统会强制生效，你只需理解剩下的软性意图。`;
+  }
+
   // 第一跳：模型决定是否调用工具
   const first = await bedrockChat({ system, messages, tools: [SEARCH_TOOL], maxTokens: 1024 });
   const uses = toolUsesOf(first);
@@ -140,7 +155,8 @@ export async function chatTurn(input: {
   for (const u of uses) {
     if (u.name === "search_listings") {
       const { intent, ...rest } = (u.input ?? {}) as { intent?: string } & WebFilters;
-      const r = await runSearch({ intent: intent ?? "", filters: rest as WebFilters, topK: 24 });
+      // 显式 filter bar 权威：base spread 在最后，覆盖模型自己抽取的字段
+      const r = await runSearch({ intent: intent ?? "", filters: { ...(rest as WebFilters), ...base }, topK: 24 });
       search = r;
       toolResults.push({ type: "tool_result", tool_use_id: u.id, content: JSON.stringify(summaryForModel(r)) });
     } else {

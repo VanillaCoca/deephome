@@ -4,12 +4,13 @@ import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import type { WebListing, WebSearchResult } from "@/src/web/searchService";
+import type { WebListing, WebSearchResult, WebFilters } from "@/src/web/searchService";
 import { ChatPanel, type ChatMessage } from "@/components/ChatPanel";
 import { Stage } from "@/components/Stage";
 import { MobileChatSheet } from "@/components/MobileChatSheet";
 import { AuthStatus } from "@/components/AuthStatus";
 import { useFavorites } from "@/lib/useFavorites";
+import { HomeHero } from "@/components/HomeHero";
 
 // 三态单舞台：
 //   S0 意图收集（单栏居中） → S1 结果（对话收进左栏，舞台主导，原地更新） → S2 详情（同舞台分层）
@@ -36,7 +37,7 @@ export default function Home() {
   const activeResult = active != null ? versions[active] : null;
   const phase = versions.length === 0 ? "intake" : "results";
 
-  async function send(text: string) {
+  async function send(text: string, filters?: WebFilters) {
     if (!text.trim() || busy) return;
     setBusy(true);
     const prevCount = activeResult?.count ?? null;
@@ -60,7 +61,7 @@ export default function Home() {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: history, text, type, focused }),
+        body: JSON.stringify({ messages: history, text, type, focused, filters: filters ?? null }),
       });
       const data = (await res.json()) as { text?: string; search?: WebSearchResult | null; error?: string };
       if (data.error) throw new Error(data.error);
@@ -129,6 +130,11 @@ export default function Home() {
     onSelectVersion: selectVersion,
   };
 
+  // 首页落地：还没有任何对话时，展示新版 Hero（aurora + 打字输入 + 意图演示）
+  if (versions.length === 0 && messages.length === 0) {
+    return <HomeHero type={type} setType={setType} onSubmit={send} />;
+  }
+
   return (
     <>
       <div className="flex h-screen overflow-hidden">
@@ -150,15 +156,22 @@ export default function Home() {
               phase === "intake" ? "mb-8 justify-end" : "justify-between border-b border-neutral-100 px-4 py-3"
             )}
           >
-            {phase === "results" && <span className="text-sm font-medium text-neutral-700">Deephome</span>}
+            {phase === "results" && (
+              <span className="flex items-center gap-2">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/deephome-logo.png" alt="" className="h-5 w-auto" />
+                <span className="text-sm font-medium tracking-tight text-neutral-800">deephome</span>
+              </span>
+            )}
             <AuthStatus />
           </div>
 
           <AnimatePresence>
             {phase === "intake" && (
-              <motion.div key="hero" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
-                <h1 className="text-4xl font-semibold tracking-tight text-neutral-900">Deephome</h1>
-                <p className="mt-3 text-neutral-500">说说你想要什么样的家 —— 我们理解你的意图，而不只是关键词。</p>
+              <motion.div key="hero" className="mb-6 flex items-center gap-2.5" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/deephome-logo.png" alt="" className="h-6 w-auto" />
+                <span className="text-base font-medium tracking-tight text-neutral-800">deephome</span>
               </motion.div>
             )}
           </AnimatePresence>
@@ -179,6 +192,22 @@ export default function Home() {
               transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
               className="flex-1 overflow-y-auto bg-neutral-50/40"
             >
+              {/* IX-1：没在看最新结果时，浮现"追平最新"胶囊；点一下跳到最新版本 */}
+              {active !== null && active !== versions.length - 1 && (
+                <div className="pointer-events-none sticky top-3 z-20 flex justify-center">
+                  <motion.button
+                    initial={{ opacity: 0, y: -8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    onClick={() => {
+                      setActive(versions.length - 1);
+                      setDetail(null);
+                    }}
+                    className="pointer-events-auto flex items-center gap-1.5 rounded-full bg-neutral-900 px-4 py-2 text-sm font-medium text-white shadow-lg transition hover:bg-neutral-700"
+                  >
+                    ↑ 回到最新结果 · {versions[versions.length - 1]?.count} 套
+                  </motion.button>
+                </div>
+              )}
               <Stage
                 result={activeResult}
                 detail={detail}
