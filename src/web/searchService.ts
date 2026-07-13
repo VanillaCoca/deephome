@@ -89,10 +89,17 @@ export async function runSearch(input: RunSearchInput): Promise<WebSearchResult>
   }
 
   // 3) 数据源（sample 默认；repliers 需 apiKey，由服务端注入）
-  const source: ListingSource =
-    sourceKind === "repliers" ? new RepliersSource(input.apiKey ?? "") : new LocalSampleSource();
-
-  const candidates = await source.search(hard, p);
+  //    韧性：Repliers 出错（坏 key / 403 / 限流）时退回样例，绝不 500。返回实际用到的源。
+  let usedKind: SourceKind = sourceKind;
+  let candidates: Listing[];
+  try {
+    const source: ListingSource =
+      sourceKind === "repliers" ? new RepliersSource(input.apiKey ?? "") : new LocalSampleSource();
+    candidates = await source.search(hard, p);
+  } catch (e) {
+    usedKind = "sample";
+    candidates = await new LocalSampleSource().search(hard, p);
+  }
   const ranked = rank(candidates, p).slice(0, topK);
 
   return {
@@ -105,7 +112,7 @@ export async function runSearch(input: RunSearchInput): Promise<WebSearchResult>
     },
     count: candidates.length,
     results: ranked.map(toWebListing),
-    source: sourceKind,
+    source: usedKind,
     filters: { ...(hard as WebFilters), ...(filters.near ? { near: filters.near } : {}) },
   };
 }

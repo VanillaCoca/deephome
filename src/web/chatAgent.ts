@@ -3,7 +3,16 @@
 // 从机制上阻止它在气泡里逐条列房源（见 UX_SPEC 的"明令禁止"）。
 
 import { bedrockChat, textOf, toolUsesOf, hasBedrockKey, type BedrockMessage } from "./bedrock";
-import { runSearch, type WebSearchResult, type WebFilters } from "./searchService";
+import { runSearch, type WebSearchResult, type WebFilters, type SourceKind } from "./searchService";
+
+// 数据源由服务端决定（key 绝不下发浏览器）：LISTINGS_SOURCE=repliers 且配了 key → 真实数据，
+// 否则样例。runSearch 内部对 Repliers 失败有样例兜底，所以这里不做 try/catch。
+function dataSource(): { source: SourceKind; apiKey?: string } {
+  if (process.env.LISTINGS_SOURCE === "repliers" && process.env.REPLIERS_API_KEY) {
+    return { source: "repliers", apiKey: process.env.REPLIERS_API_KEY };
+  }
+  return { source: "sample" };
+}
 
 export interface TurnMessage {
   role: "user" | "assistant";
@@ -104,6 +113,7 @@ export async function chatTurn(input: {
       intent: input.userText,
       filters: base,
       topK: 24,
+      ...dataSource(),
     });
     const note = !hasKey
       ? "（未配置 Bedrock key，当前由确定性规则引擎理解意图）"
@@ -157,7 +167,7 @@ export async function chatTurn(input: {
     if (u.name === "search_listings") {
       const { intent, ...rest } = (u.input ?? {}) as { intent?: string } & WebFilters;
       // 显式 filter bar 权威：base spread 在最后，覆盖模型自己抽取的字段
-      const r = await runSearch({ intent: intent ?? "", filters: { ...(rest as WebFilters), ...base }, topK: 24 });
+      const r = await runSearch({ intent: intent ?? "", filters: { ...(rest as WebFilters), ...base }, topK: 24, ...dataSource() });
       search = r;
       toolResults.push({ type: "tool_result", tool_use_id: u.id, content: JSON.stringify(summaryForModel(r)) });
     } else {
