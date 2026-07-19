@@ -98,7 +98,7 @@ export async function runSearch(input: RunSearchInput): Promise<WebSearchResult>
     candidates = await source.search(hard, p);
   } catch (e) {
     usedKind = "sample";
-    candidates = await new LocalSampleSource().search(hard, p);
+    candidates = await new LocalSampleSource().search(hard); // 样例源忽略 plan，只按硬过滤
   }
   const ranked = rank(candidates, p).slice(0, topK);
 
